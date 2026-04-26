@@ -5943,6 +5943,16 @@ static void *stbi__tga_load(stbi__context *s, int *x, int *y, int *comp, int req
    if (!stbi__mad3sizes_valid(tga_width, tga_height, tga_comp, 0))
       return stbi__errpuc("too large", "Corrupt TGA");
 
+   // For non-RLE, non-indexed TGA the pixel data is stored uncompressed, so the
+   // input buffer must be large enough to hold it.  A crafted header with large
+   // dimensions but a tiny payload would otherwise cause a multi-GB allocation.
+   if (!tga_is_RLE && !tga_indexed && !s->read_from_callbacks) {
+      int total_input   = (int)(s->img_buffer_original_end - s->img_buffer_original);
+      int pixel_bytes   = tga_width * tga_height * tga_comp; // safe: stbi__mad3sizes_valid passed
+      if (pixel_bytes > total_input)
+         return stbi__errpuc("bad data", "TGA pixel data exceeds input buffer size");
+   }
+
    tga_data = (unsigned char*)stbi__malloc_mad3(tga_width, tga_height, tga_comp, 0);
    if (!tga_data) return stbi__errpuc("outofmem", "Out of memory");
 
